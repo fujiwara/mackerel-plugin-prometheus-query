@@ -2,9 +2,7 @@ package promq
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -19,13 +17,16 @@ import (
 )
 
 var formatRe = regexp.MustCompile(`\{.*?\}`)
-var digitRe = regexp.MustCompile(`[^\w-]`)
+var normalizeRe = regexp.MustCompile(`[^\w-]`)
+var normalizedStr = "_"
+var unmachedLabel = "_"
 
-// Plugin mackerel plugin for gunfish
+// Plugin mackerel plugin for prometheus query
 type Plugin struct {
 	Address string
 	Format  string
 	Query   string
+	Timeout time.Duration
 }
 
 type metric struct {
@@ -40,13 +41,13 @@ func (m *metric) String() string {
 	return strings.Join([]string{m.key, value, ts}, "\t")
 }
 
-func (p Plugin) fetchMetrics() ([]*metric, error) {
+func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
 	client, err := prometheus.NewClient(prometheus.Config{Address: p.Address})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to new client to prometheus API")
+		return nil, errors.Wrap(err, "failed to new client for prometheus API")
 	}
 	api := v1.NewAPI(client)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, p.Timeout)
 	defer cancel()
 
 	result, warnings, err := api.Query(ctx, p.Query, time.Now())
@@ -54,7 +55,9 @@ func (p Plugin) fetchMetrics() ([]*metric, error) {
 		return nil, errors.Wrapf(err, "failed to query to prometheous API %s", p.Address)
 	}
 	if len(warnings) > 0 {
-		log.Printf("Warnings: %v\n", warnings)
+		for _, w := range warnings {
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+		}
 	}
 
 	var vector model.Vector
@@ -62,44 +65,32 @@ func (p Plugin) fetchMetrics() ([]*metric, error) {
 	case model.ValVector:
 		vector = result.(model.Vector)
 	default:
-		return nil, errors.Errorf("unexpected value type %s", result.Type())
+		return nil, errors.Errorf("unexpected query response value type %s, vector required", result.Type())
 	}
-	ret := make([]*metric, 0, len(vector))
+	metrics := make([]*metric, 0, len(vector))
 	for _, s := range vector {
-		ret = append(ret, &metric{
-			key:       p.formatKey(s.Metric),
+		metrics = append(metrics, &metric{
+			key:       formatKey(s.Metric, p.Format),
 			value:     float64(s.Value),
 			timestamp: s.Timestamp.Time(),
 		})
 	}
-	return ret, nil
+	return metrics, nil
 }
 
-func (p *Plugin) formatKey(m model.Metric) string {
-	return formatRe.ReplaceAllStringFunc(p.Format, func(match string) string {
+func formatKey(m model.Metric, format string) string {
+	return formatRe.ReplaceAllStringFunc(format, func(match string) string {
 		key := strings.Trim(match, "{}")
-		if label := m[model.LabelName(key)]; label == "" {
-			return "__unmatched__"
-		} else {
-			return digitRe.ReplaceAllString(string(label), "_")
+		if label, exists := m[model.LabelName(key)]; exists {
+			return normalizeRe.ReplaceAllString(string(label), normalizedStr)
 		}
+		return unmachedLabel
 	})
 }
 
-// Do the plugin
-func Do() error {
-	optAddress := flag.String("address", "http://localhost:9090", "Prometheus address")
-	optFormat := flag.String("metric-key-format", "", "Metric key format")
-	optQuery := flag.String("query", "", "PromQL query")
-	flag.Parse()
-
-	promq := Plugin{
-		Address: *optAddress,
-		Format:  *optFormat,
-		Query:   *optQuery,
-	}
-
-	metrics, err := promq.fetchMetrics()
+// Run runs plugin
+func (p *Plugin) Run(ctx context.Context) error {
+	metrics, err := p.fetch(ctx)
 	if err != nil {
 		return err
 	}
