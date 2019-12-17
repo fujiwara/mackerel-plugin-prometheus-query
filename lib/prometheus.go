@@ -27,6 +27,7 @@ type Plugin struct {
 	Format  string
 	Query   string
 	Timeout time.Duration
+	EmitZero bool
 }
 
 type metric struct {
@@ -73,6 +74,13 @@ func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
 			key:       formatKey(s.Metric, p.Format),
 			value:     float64(s.Value),
 			timestamp: s.Timestamp.Time(),
+		})
+	}
+	if len(metrics) == 0 && p.EmitZero {
+		metrics = append(metrics, &metric{
+			key: p.Format,
+			value: 0,
+			timestamp: time.Now(),
 		})
 	}
 	return metrics, nil

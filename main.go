@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -23,6 +23,7 @@ func run() error {
 	optFormat := flag.String("metric-key-format", "", "Metric key format")
 	optQuery := flag.String("query", "", "PromQL query")
 	optTimeout := flag.String("timeout", "10s", "timeout for query")
+	optEmitZero := flag.Bool("emit-zero", false, "emit 0 when query returns no result")
 	flag.Parse()
 
 	to, err := time.ParseDuration(*optTimeout)
@@ -31,10 +32,11 @@ func run() error {
 	}
 
 	p := promq.Plugin{
-		Address: *optAddress,
-		Format:  *optFormat,
-		Query:   *optQuery,
-		Timeout: to,
+		Address:  *optAddress,
+		Format:   *optFormat,
+		Query:    *optQuery,
+		Timeout:  to,
+		EmitZero: *optEmitZero,
 	}
 
 	return p.Run(context.Background())
