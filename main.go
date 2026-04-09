@@ -23,6 +23,7 @@ func run() error {
 	optQuery := flag.String("query", "", "PromQL query")
 	optTimeout := flag.String("timeout", "10s", "timeout for query")
 	optEmitZero := flag.Bool("emit-zero", false, "emit 0 when query returns no result")
+	optAuthHeader := flag.String("authorization-header", "", "Authorization header value (e.g. \"Bearer TOKEN\")")
 	flag.Parse()
 
 	to, err := time.ParseDuration(*optTimeout)
@@ -31,11 +32,12 @@ func run() error {
 	}
 
 	p := promq.Plugin{
-		Address:  *optAddress,
-		Format:   *optFormat,
-		Query:    *optQuery,
-		Timeout:  to,
-		EmitZero: *optEmitZero,
+		Address:             *optAddress,
+		Format:              *optFormat,
+		Query:               *optQuery,
+		Timeout:             to,
+		EmitZero:            *optEmitZero,
+		AuthorizationHeader: *optAuthHeader,
 	}
 
 	return p.Run(context.Background())
