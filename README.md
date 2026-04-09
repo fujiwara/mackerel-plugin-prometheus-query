@@ -6,9 +6,10 @@ Prometheus query plugin for Mackerel.
 
 ```
 Usage of mackerel-plugin-prometheus-query:
-Usage of ./mackerel-plugin-prometheus-query:
   -address string
     	Prometheus address (default "http://localhost:9090")
+  -authorization-header string
+    	Authorization header value (e.g. "Bearer TOKEN")
   -emit-zero
     	emit 0 when query returns no result
   -metric-key-format string

@@ -3,6 +3,7 @@ package promq
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
@@ -21,11 +22,12 @@ var unmachedLabel = "_"
 
 // Plugin mackerel plugin for prometheus query
 type Plugin struct {
-	Address  string
-	Format   string
-	Query    string
-	Timeout  time.Duration
-	EmitZero bool
+	Address             string
+	Format              string
+	Query               string
+	Timeout             time.Duration
+	EmitZero            bool
+	AuthorizationHeader string
 }
 
 type metric struct {
@@ -40,8 +42,26 @@ func (m *metric) String() string {
 	return strings.Join([]string{m.key, value, ts}, "\t")
 }
 
+type authorizationRoundTripper struct {
+	header string
+	rt     http.RoundTripper
+}
+
+func (a *authorizationRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	r2 := r.Clone(r.Context())
+	r2.Header.Set("Authorization", a.header)
+	return a.rt.RoundTrip(r2)
+}
+
 func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
-	client, err := prometheus.NewClient(prometheus.Config{Address: p.Address})
+	cfg := prometheus.Config{Address: p.Address}
+	if p.AuthorizationHeader != "" {
+		cfg.RoundTripper = &authorizationRoundTripper{
+			header: p.AuthorizationHeader,
+			rt:     http.DefaultTransport,
+		}
+	}
+	client, err := prometheus.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new client for prometheus API: %w", err)
 	}
