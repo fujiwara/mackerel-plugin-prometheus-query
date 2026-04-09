@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	prometheus "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	model "github.com/prometheus/common/model"
@@ -23,10 +21,10 @@ var unmachedLabel = "_"
 
 // Plugin mackerel plugin for prometheus query
 type Plugin struct {
-	Address string
-	Format  string
-	Query   string
-	Timeout time.Duration
+	Address  string
+	Format   string
+	Query    string
+	Timeout  time.Duration
 	EmitZero bool
 }
 
@@ -45,7 +43,7 @@ func (m *metric) String() string {
 func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
 	client, err := prometheus.NewClient(prometheus.Config{Address: p.Address})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to new client for prometheus API")
+		return nil, fmt.Errorf("failed to new client for prometheus API: %w", err)
 	}
 	api := v1.NewAPI(client)
 	ctx, cancel := context.WithTimeout(ctx, p.Timeout)
@@ -53,7 +51,7 @@ func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
 
 	result, warnings, err := api.Query(ctx, p.Query, time.Now())
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query to prometheous API %s", p.Address)
+		return nil, fmt.Errorf("failed to query to prometheus API %s: %w", p.Address, err)
 	}
 	if len(warnings) > 0 {
 		for _, w := range warnings {
@@ -66,7 +64,7 @@ func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
 	case model.ValVector:
 		vector = result.(model.Vector)
 	default:
-		return nil, errors.Errorf("unexpected query response value type %s, vector required", result.Type())
+		return nil, fmt.Errorf("unexpected query response value type %s, vector required", result.Type())
 	}
 	metrics := make([]*metric, 0, len(vector))
 	for _, s := range vector {
@@ -78,8 +76,8 @@ func (p Plugin) fetch(ctx context.Context) ([]*metric, error) {
 	}
 	if len(metrics) == 0 && p.EmitZero {
 		metrics = append(metrics, &metric{
-			key: p.Format,
-			value: 0,
+			key:       p.Format,
+			value:     0,
 			timestamp: time.Now(),
 		})
 	}
