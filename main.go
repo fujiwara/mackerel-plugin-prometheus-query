@@ -8,7 +8,6 @@ import (
 	"time"
 
 	promq "github.com/fujiwara/mackerel-plugin-prometheus-query/lib"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -28,7 +27,7 @@ func run() error {
 
 	to, err := time.ParseDuration(*optTimeout)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse timeout")
+		return fmt.Errorf("failed to parse timeout: %w", err)
 	}
 
 	p := promq.Plugin{
