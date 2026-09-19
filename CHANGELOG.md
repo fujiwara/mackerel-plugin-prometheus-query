@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.1.2](https://github.com/fujiwara/mackerel-plugin-prometheus-query/compare/v0.1.1...v0.1.2) - 2026-09-19
+- Rename CLAUDE.md to AGENTS.md by @fujiwara in https://github.com/fujiwara/mackerel-plugin-prometheus-query/pull/9
+
 ## [v0.1.1](https://github.com/fujiwara/mackerel-plugin-prometheus-query/compare/v0.1.0...v0.1.1) - 2026-04-09
 - Support mkr plugin install packaging by @fujiwara in https://github.com/fujiwara/mackerel-plugin-prometheus-query/pull/7
 
